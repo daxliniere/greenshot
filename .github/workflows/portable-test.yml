@@ -1,0 +1,37 @@
+name: Portable test build
+
+on:
+  push:
+    branches: [portable-image-fit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: microsoft/setup-msbuild@v2
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        shell: cmd
+        run: msbuild src/Greenshot.sln /p:Configuration=Release /restore /t:PrepareForBuild
+      - name: Build
+        shell: cmd
+        run: msbuild src/Greenshot.sln /p:Configuration=Release /t:Rebuild /v:normal
+      - name: Prepare portable ZIP
+        shell: pwsh
+        run: |
+          ./prepare-portable.ps1 -RepositoryRootPath "$env:GITHUB_WORKSPACE" -BuildArtifactsPath "$env:GITHUB_WORKSPACE/src/Greenshot/bin/Release/net480" -OutputPath "$env:GITHUB_WORKSPACE/portable"
+          Compress-Archive -Path "$env:GITHUB_WORKSPACE/portable/*" -DestinationPath "$env:GITHUB_WORKSPACE/Greenshot-portable.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Greenshot-portable
+          path: Greenshot-portable.zip
+          if-no-files-found: error
